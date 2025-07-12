@@ -1,40 +1,42 @@
-*{
-    margin: 0;
-    padding: 0;
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
-ul{
-    list-style: none;
+body {
+  background: #f0f0f0;
+  display: flex;
+  justify-content: center;
+  padding-top: 2rem;
+  font-family: sans-serif;
 }
-body{
-    height: 100%;
-    overflow: hidden;
+.wrapper {
+  text-align: center;
 }
-.score{
-    text-align: center ;
-    font-size: 36px;
-    margin-bottom: 2rem;
+.score {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
 }
-.playground > ul{
-    width: 250px;
-    margin: 0 auto;
+.playground > ul {
+  width: 250px;
+  border: 2px solid #333;
 }
-.playground > ul > li{
-    width: 100%;
-    height: 25px;
+.playground li {
+  list-style: none;
 }
-.playground > ul > li > ul {
-    display: flex;
+.playground > ul > li {
+  display: flex;
 }
-.playground > ul > li > ul > li{
-    width: 25px;
-    height: 25px;
-    outline: 1px solid #ccc;
+.playground > ul > li > li {
+  width: 25px;
+  height: 25px;
+  border: 1px solid #ccc;
 }
-/* 움직이는 블록(tree) */
-.playground ul li ul li.tree {
-  background-color: #6c2;
-}
-/* 고정된 블록 */
-.playground ul li ul li.seized {
+/* 고정된 블록 색 */
+.playground li li.fixed {
   background-color: #333;
+}
+/* 움직이는 블록 색 */
+.playground li li.moving {
+  background-color: #6c2;
 }

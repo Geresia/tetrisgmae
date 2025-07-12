@@ -1,180 +1,176 @@
-// DOM
+// — 설정 값 —
+const ROWS = 20;
+const COLS = 10;
+const DROP_INTERVAL = 500;  // ms
+
+// — DOM 참조 —
 const playground = document.querySelector('.playground ul');
-const scoreDisplay = document.querySelector('.score');
+const scoreEl    = document.querySelector('.score');
 
-// Settings
-const GAME_ROWS = 20;
-const GAME_COLS = 10;
+let board;         // 2D 배열
+let current;       // 현재 블록 상대 좌표
+let pos;           // {row, col}
+let score;
+let gameInterval;
 
-// Variables
-let score = 0;
-let duration = 500;
-let downInterval;
-let tempMovingItem;
-
-// 게임판을 0/1 배열로 관리
-const board = Array.from(
-  { length: GAME_ROWS },
-  () => Array(GAME_COLS).fill(0)
-);
-
-// 블록 모양 정의 (현재는 2×2 정사각 블록만)
-const BLOCKS = {
-  tree: [
-    [[0, 0], [0, 1], [1, 0], [1, 1]],
-    [], [], []
-  ]
-};
-
-// 현재 움직이는 블록 정보
-let movingItem = {
-  type: 'tree',
-  direction: 0,
-  top: 0,
-  left: 4,   // 가운데서 시작
-};
-
-// 초기화: DOM 그리드 생성
+// — 초기화 함수 —
 function init() {
-  tempMovingItem = { ...movingItem };
-  for (let i = 0; i < GAME_ROWS; i++) {
-    prependNewLine();
+  // 보드 배열 초기화
+  board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+  // DOM 그리드 생성
+  for (let r = 0; r < ROWS; r++) {
+    const row = document.createElement('li');
+    for (let c = 0; c < COLS; c++) {
+      row.appendChild(document.createElement('li'));
+    }
+    playground.appendChild(row);
+  }
+  // 점수 초기화
+  score = 0;
+  scoreEl.innerText = `Score: ${score}`;
+  // 첫 블록 생성 & 자동 낙하
+  spawnBlock();
+  gameInterval = setInterval(drop, DROP_INTERVAL);
+  document.addEventListener('keydown', handleKey);
+}
+
+// — O 블록 스폰 —
+function spawnBlock() {
+  current = [
+    [0, 0], [0, 1],
+    [1, 0], [1, 1]
+  ];
+  pos = { row: 0, col: Math.floor((COLS - 2) / 2) };
+  if (isCollision(pos.row, pos.col)) {
+    clearInterval(gameInterval);
+    alert('게임 오버! 최종 점수: ' + score);
+    return;
+  }
+  render();
+}
+
+// — 충돌 검사 —
+function isCollision(r, c) {
+  return current.some(([dr, dc]) => {
+    const nr = r + dr;
+    const nc = c + dc;
+    // 좌우 벽/바닥 충돌
+    if (nc < 0 || nc >= COLS || nr >= ROWS) return true;
+    // 고정 블록 충돌
+    if (nr >= 0 && board[nr][nc] === 1) return true;
+    return false;
+  });
+}
+
+// — 한 칸 낙하 —
+function drop() {
+  pos.row++;
+  if (isCollision(pos.row, pos.col)) {
+    pos.row--;
+    fixBlock();
+    clearLines();
+    spawnBlock();
+    return;
+  }
+  render();
+}
+
+// — 블록 고정 —
+function fixBlock() {
+  current.forEach(([dr, dc]) => {
+    const rr = pos.row + dr;
+    const cc = pos.col + dc;
+    if (rr >= 0) board[rr][cc] = 1;
+  });
+}
+
+// — 줄 삭제 & 점수 +1 —
+function clearLines() {
+  let lines = 0;
+  for (let r = 0; r < ROWS; r++) {
+    if (board[r].every(v => v === 1)) {
+      board.splice(r, 1);
+      board.unshift(Array(COLS).fill(0));
+      lines++;
+    }
+  }
+  if (lines > 0) {
+    score += lines;
+    scoreEl.innerText = `Score: ${score}`;
   }
 }
 
-// 한 줄(ul>li)을 생성해서 playground에 붙이는 함수
-function prependNewLine() {
-  const li = document.createElement('li');
-  const ul = document.createElement('ul');
-  for (let j = 0; j < GAME_COLS; j++) {
-    const matrix = document.createElement('li');
-    ul.prepend(matrix);
+// — 화면 렌더 —
+function render() {
+  // 1) 모든 셀 초기화
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const cell = playground.children[r].children[c];
+      cell.className = board[r][c] ? 'fixed' : '';
+    }
   }
-  li.prepend(ul);
-  playground.prepend(li);
-}
-
-// 화면에 점수 표시
-function showScore() {
-  scoreDisplay.innerText = score;
-}
-
-// 보드+현재 블록을 모두 그리는 함수
-function renderAll() {
-  // 1) 기존 렌더링 모두 초기화
-  playground.querySelectorAll('li li').forEach(cell => {
-    cell.className = '';
-  });
-
-  // 2) 보드에 고정된 블록 그리기
-  board.forEach((row, y) => {
-    row.forEach((val, x) => {
-      if (val) {
-        playground.children[y].children[x].classList.add('seized');
-      }
-    });
-  });
-
-  // 3) 현재 움직이는 블록 그리기
-  renderBlocks();
-  showScore();
-}
-
-// 현재 블록만 그리는 함수
-function renderBlocks() {
-  const { type, direction, top, left } = tempMovingItem;
-  BLOCKS[type][direction].forEach(([rowOffset, colOffset]) => {
-    const x = colOffset + left;
-    const y = rowOffset + top;
-    const rowEl = playground.children[y];
-    if (!rowEl) return;
-    const cell = rowEl.children[x];
-    if (!cell) return;
-    cell.classList.add(type);
-  });
-}
-
-// 충돌 검사: 바닥에 닿았거나 이미 고정된 블록과 겹치는지
-function checkCollision() {
-  const { type, direction, top, left } = tempMovingItem;
-  return BLOCKS[type][direction].some(([rowOffset, colOffset]) => {
-    const x = colOffset + left;
-    const y = rowOffset + top;
-    // 범위 밖이거나 board[y][x]가 1인 경우 충돌
-    return (
-      x < 0 ||
-      x >= GAME_COLS ||
-      y >= GAME_ROWS ||
-      board[y][x] === 1
-    );
-  });
-}
-
-// 블록을 한 칸 내리는 동작
-function moveBlock() {
-  tempMovingItem.top += 1;
-  if (checkCollision()) {
-    // 충돌 시 원위치 → 고정(seize)
-    tempMovingItem.top -= 1;
-    seizeBlock();
-  }
-  renderAll();
-}
-
-// 블록 고정하고, 한 줄 완성 체크→삭제→점수 반영 후 새 블록 생성
-function seizeBlock() {
-  const { type, direction, top, left } = tempMovingItem;
-  BLOCKS[type][direction].forEach(([rowOffset, colOffset]) => {
-    const x = colOffset + left;
-    const y = rowOffset + top;
-    board[y][x] = 1;
-  });
-  checkLine();
-  generateNewBlock();
-}
-
-// 완성된 줄이 있으면 삭제하고 맨 위에 빈 줄 추가, 점수 +100
-function checkLine() {
-  board.forEach((row, y) => {
-    if (row.every(val => val === 1)) {
-      board.splice(y, 1);
-      board.unshift(Array(GAME_COLS).fill(0));
-      score += 100;
+  // 2) 현재 블록
+  current.forEach(([dr, dc]) => {
+    const rr = pos.row + dr;
+    const cc = pos.col + dc;
+    if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) {
+      playground.children[rr].children[cc]
+                .classList.add('moving');
     }
   });
 }
 
-// 새 블록 시작: 이동 정보 초기화 + 인터벌 재시작
-function generateNewBlock() {
-  clearInterval(downInterval);
-  movingItem = {
-    type: 'tree',
-    direction: 0,
-    top: 0,
-    left: 4,
+// — 도형 정의 (회전 없이 단일 방향) —
+const PIECES = {
+  I: [[0,1],[1,1],[2,1],[3,1]],
+  J: [[0,0],[1,0],[2,0],[2,1]],
+  L: [[0,1],[1,1],[2,1],[2,0]],
+  O: [[0,0],[0,1],[1,0],[1,1]],
+  S: [[0,1],[0,2],[1,0],[1,1]],
+  T: [[0,1],[1,0],[1,1],[1,2]],
+  Z: [[0,0],[0,1],[1,1],[1,2]]
+};
+
+// — 기존 변수 선언 등 생략 …
+
+// — spawnBlock() 수정 —  
+function spawnBlock() {
+  // 1) 랜덤 도형 선택
+  const types = Object.keys(PIECES);
+  current = PIECES[ types[Math.floor(Math.random() * types.length)] ];
+  // 2) 시작 위치(가로 중앙)
+  pos = {
+    row: 0,
+    col: Math.floor((COLS - 4) / 2)  // 넉넉히 중앙(3)로 설정
   };
-  tempMovingItem = { ...movingItem };
-  downInterval = setInterval(moveBlock, duration);
+  // 3) 스폰 즉시 충돌 검사 → 게임 오버
+  if (isCollision(pos.row, pos.col)) {
+    clearInterval(gameInterval);
+    alert('게임 오버! 최종 점수: ' + score);
+    return;
+  }
+  // 4) 화면에 그리기
+  render();
 }
 
-// 키보드 화살표로 블록 좌우·하단 이동 제어
-document.addEventListener('keydown', e => {
+// — 키 입력 제어 —
+function handleKey(e) {
   switch (e.key) {
     case 'ArrowLeft':
-      tempMovingItem.left -= 1;
-      if (checkCollision()) tempMovingItem.left += 1;
+      if (!isCollision(pos.row, pos.col - 1)) {
+        pos.col--; render();
+      }
       break;
     case 'ArrowRight':
-      tempMovingItem.left += 1;
-      if (checkCollision()) tempMovingItem.left -= 1;
+      if (!isCollision(pos.row, pos.col + 1)) {
+        pos.col++; render();
+      }
       break;
     case 'ArrowDown':
-      moveBlock();
+      drop();
       break;
   }
-  renderAll();
-});
+}
 
-// 게임 시작
-init();
-generateNewBlock();
+// — 시작 —
+window.addEventListener('DOMContentLoaded', init);
